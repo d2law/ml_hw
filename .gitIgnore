@@ -1,0 +1,3 @@
+tmp_storage/*
+node_modules/*
+bin/*

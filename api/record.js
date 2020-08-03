@@ -2,31 +2,35 @@ const fs = require('fs');
 const express = require('express');
 var router = express.Router();
 const multer = require('multer');
-const filepath = '/home/d2law/repos/ml-hw/tmp_storage/'
-const csv=require('csvtojson')
+const filepath = './tmp_storage/'
+const csv = require('csvtojson')
 const mongodb = require("mongodb").MongoClient;
+var mongo_config = require("../config").mongo_config;
 
-var url = "mongodb://localhost:27017/";
+var url = mongo_config.host;
 
 // -> Import CSV File to MongoDB database
-function importCsvData2MongoDB(file){
+function importCsvData2MongoDB(file) {
     csv()
         .fromFile(filepath + file)
-        .then((jsonObj)=>{
-           // console.log(jsonObj); + 
-          
+        .then((jsonObj) => {
+            var today = new Date(); 
+            jsonObj.forEach(function (elem) {
+                elem.import_date = today;
+            })
+
             // Insert Json-Object to MongoDB
             mongodb.connect(url, { useNewUrlParser: true }, (err, db) => {
                 if (err) throw err;
-                let dbo = db.db("mldb");
-                dbo.collection("sales").insertMany(jsonObj, (err, res) => {
-                   if (err) throw err;
-                   console.log("Number of documents inserted: " + res.insertedCount);
-                   db.close();
+                var dbo = db.db(mongo_config.db);
+                dbo.collection(mongo_config.collection).insertMany(jsonObj, (err, res) => {
+                    if (err) throw err;
+                    console.log("Number of documents inserted: " + res.insertedCount);
+                    db.close();
                 });
             });
-      
-            fs.unlinkSync(filePath);
+
+            fs.unlinkSync(filepath + file);
         })
 }
 
@@ -65,7 +69,7 @@ router.post('/record', (req, res, next) => {
             res.end("Something went wrong!");
         }
 
-        importCsvData2MongoDB(  file.filename);
+        importCsvData2MongoDB(file.filename);
         res.json({ message: "file uploaded" + file.filename + ", " + file.size + "byte" });
     })
 });

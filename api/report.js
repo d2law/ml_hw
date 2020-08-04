@@ -1,34 +1,49 @@
 const mongodb = require("mongodb").MongoClient;
-var assert = require('assert');
+const express = require('express');
+const { query } = require("express");
+var router = express.Router();
 var mongo_config = require("../config").mongo_config;
+format = require('util').format;
 
-// db url
-var url = mongo_config.host;
+router.get('/report', function (req, res) {
+    var querystr = {};
 
-var findDocuments = function (db, callback) {
-    var dbo = db.db(mongo_config.db);
-    var collection = dbo.collection(mongo_config.collection);
-    // Find some documents
-    collection.find({ name: 'Dratini' }).toArray(function (err, docs) {
-        console.log("Found the following records");
-        callback(docs);
-    });
-}
+    exact_date = req.query.date;
+    start_date = req.query.start_date;
+    end_date = req.query.end_date;
 
-// Use connect method to connect to the Server
-MongoClient.connect(url, function (err, db) {
-    assert.equal(null, err);
-    console.log("Connected correctly to server");
-    findDocuments(db, function (docs) {
-        console.log(docs);
-        exports.getPokemonByName = function () {
-            return docs;
+    if (exact_date) {
+        if (start_date || end_date) {
+            res.status(500);
+            res.send("choose either exact date or date range, but not both");
         }
-        db.close();
+        querystr.import_date = {
+            $gte: new Date(exact_date + 'T00:00:00.000Z'),
+            $lte: new Date(exact_date + 'T23:59:59.999Z')
+        }
+    } else if (start_date && end_date) {
+        querystr.import_date = {
+            $gte: new Date(start_date + 'T00:00:00.000Z'),
+            $lte: new Date(end_date + 'T23:59:59.999Z')
+        }
+    } else {
+        res.status(500);
+            res.send("choose either exact date or date range");
+    }
+
+
+    mongodb.connect(mongo_config.host, function (err, db) {
+        if (err) throw err;
+
+        var dbo = db.db(mongo_config.db);
+
+        dbo.collection(mongo_config.collection).find(querystr).toArray(function (err, result) {
+            if (err) throw err;
+            res.json(result);
+            db.close();
+
+        });
     });
 });
 
-router.get('/report', function (req, res) {
-    
-    res.jsonp(db.getPokemonByName());
-  });
+module.exports = router;
